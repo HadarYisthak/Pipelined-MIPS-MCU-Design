@@ -1,0 +1,79 @@
+---------------------------------------------------------------------------------------------
+-- Copyright 2025 Hananya Ribo 
+-- Advanced CPU architecture and Hardware Accelerators Lab 361-1-4693 BGU
+---------------------------------------------------------------------------------------------
+--  Execute module (implements the data ALU and Branch Address Adder  
+--  for the MIPS computer)
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE IEEE.STD_LOGIC_ARITH.ALL;
+use ieee.std_logic_unsigned.all;
+USE work.aux_package.all;
+
+
+ENTITY  Execute IS
+	generic(
+		DATA_BUS_WIDTH : integer := 32;
+		FUNCT_WIDTH : integer := 6;
+		PC_WIDTH : integer := 10
+	);
+	PORT(		read_data1_i 	: IN 	STD_LOGIC_VECTOR(DATA_BUS_WIDTH-1 DOWNTO 0);
+			read_data2_i 	: IN 	STD_LOGIC_VECTOR(DATA_BUS_WIDTH-1 DOWNTO 0);
+			sign_extend_i 	: IN 	STD_LOGIC_VECTOR(DATA_BUS_WIDTH-1 DOWNTO 0);
+			funct_i 	: IN 	STD_LOGIC_VECTOR(FUNCT_WIDTH-1 DOWNTO 0);
+			ALUOp_ctrl_i 	: IN 	STD_LOGIC_VECTOR(1 DOWNTO 0);
+			ALUSrc_ctrl_i 	: IN 	STD_LOGIC;
+			pc_plus4_i 	: IN 	STD_LOGIC_VECTOR(PC_WIDTH-1 DOWNTO 0);
+			Opcode_i	: IN 	STD_LOGIC_VECTOR(FUNCT_WIDTH-1 DOWNTO 0);
+			zero_o 		: OUT	STD_LOGIC;
+			alu_res_o 	: OUT	STD_LOGIC_VECTOR(DATA_BUS_WIDTH-1 DOWNTO 0);
+			addr_res_o 	: OUT	STD_LOGIC_VECTOR( 7 DOWNTO 0 )
+	);
+END Execute;
+
+
+ARCHITECTURE behavior OF Execute IS
+SIGNAL a_input_w, b_input_w				: STD_LOGIC_VECTOR(DATA_BUS_WIDTH-1 DOWNTO 0);
+SIGNAL alu_out_mux_w					: STD_LOGIC_VECTOR(DATA_BUS_WIDTH-1 DOWNTO 0);
+SIGNAL branch_addr_r 					: STD_LOGIC_VECTOR(7 DOWNTO 0);
+SIGNAL alu_ctl_w					: STD_LOGIC_VECTOR(3 DOWNTO 0);
+SIGNAL dir_w						: STD_LOGIC;
+BEGIN
+	a_input_w <= 	read_data1_i;
+	-- ALU input mux
+	b_input_w <= 	read_data2_i WHEN (ALUSrc_ctrl_i = '0') ELSE
+					sign_extend_i(DATA_BUS_WIDTH-1 DOWNTO 0);
+
+--------------------------------------------------------------------------------------------------------				
+	-- Adder to compute Branch Address
+	branch_addr_r	<= pc_plus4_i(PC_WIDTH-1 DOWNTO 2) + sign_extend_i(7 DOWNTO 0) ;
+	addr_res_o 	<= branch_addr_r(7 DOWNTO 0);
+
+	-----alu port map
+	ALU_CTL : ALU_CONTROL
+	PORT MAP (	
+		ALUOp	=> 	ALUOp_ctrl_i,
+		Funct	=> 	funct_i	, 
+		Opcode	=>	Opcode_i,
+		ALU_ctl	=>	alu_ctl_w
+);
+
+-----alu port map
+	LOGIC : ALU
+	PORT MAP (	
+		zero_o		=> 	zero_o,
+		b_input_w	=> 	b_input_w	, 
+		a_input_w	=>	a_input_w,
+		ALU_ctl		=>	alu_ctl_w,
+		alu_res_o	=>	alu_res_o
+);
+
+
+
+  
+
+
+
+
+END behavior;
+

@@ -1,0 +1,101 @@
+-------- Ifetch module (provides the PC and instruction memory for the MIPS computer)
+LIBRARY IEEE;
+USE IEEE.STD_LOGIC_1164.ALL;
+USE IEEE.STD_LOGIC_ARITH.ALL;
+USE IEEE.STD_LOGIC_UNSIGNED.ALL;
+LIBRARY altera_mf;
+USE altera_mf.altera_mf_components.all;
+---------------- ENTITY ------------------
+ENTITY Ifetch IS
+	GENERIC (MemWidth	: INTEGER;
+		SIM 		: BOOLEAN);
+	PORT(	IF_instruction_o				: OUT	STD_LOGIC_VECTOR( 31 DOWNTO 0 );
+        	IF_pc_plus_4_o 					: OUT	STD_LOGIC_VECTOR( 7 DOWNTO 0 );
+		PCSrc_i 					: IN 	STD_LOGIC_VECTOR( 1 DOWNTO 0 );
+        	Add_result_i 					: IN 	STD_LOGIC_VECTOR( 7 DOWNTO 0 );
+      		IF_pc_o 					: OUT	STD_LOGIC_VECTOR( 7 DOWNTO 0 );
+		JumpAddr_i					: IN	STD_LOGIC_VECTOR( 7 DOWNTO 0 );
+        	clock, Stall_IF, reset,RUN		 		: IN 	STD_LOGIC);
+END Ifetch;
+--------------- ARCHITECTURE --------------
+ARCHITECTURE behavior OF Ifetch IS
+	SIGNAL PC_w, PC_plus_4_w 	 : STD_LOGIC_VECTOR( 7 DOWNTO 0 ) := x"00";
+	SIGNAL next_PC_w		 : STD_LOGIC_VECTOR( 7 DOWNTO 0 );
+	SIGNAL Mem_Addr 		 : STD_LOGIC_VECTOR(MemWidth-1 DOWNTO 0 ); 
+	SIGNAL Mem_clock		 : STD_LOGIC;
+BEGIN
+
+
+--------------- ROM for Instruction Memory ---------------
+inst_memory: altsyncram
+	
+	GENERIC MAP (
+		operation_mode => "ROM",
+		width_a => 32,
+		widthad_a => MemWidth,
+		lpm_type => "altsyncram",
+		outdata_reg_a => "UNREGISTERED",
+		init_file => "C:\intelFPGA\work\lab5\FILES\ITCM.hex",
+		intended_device_family => "Cyclone"
+	)
+	PORT MAP (
+		clock0     => Mem_clock,  -- reading from memory in Falling Edge 
+		address_a  => Mem_Addr, 
+		q_a 	   => IF_instruction_o
+		);
+---------------for falling edge-----------------------	
+		Mem_clock <= not clock;
+
+
+---------- Send address to inst. memory address register ---------
+
+		ModelSim: 
+		IF (SIM = TRUE) GENERATE
+				Mem_Addr <= "00" & PC_w(7 DOWNTO 0);
+		END GENERATE ModelSim;
+		
+		FPGA: 
+		IF (SIM = FALSE) GENERATE
+				Mem_Addr <="00" & PC_w(7 DOWNTO 0);
+		END GENERATE FPGA;
+		
+---------- Adder to increment PC by 4 ----------------------       
+      		PC_plus_4_w(7 DOWNTO 0)  <= PC_w(7 DOWNTO 0) + 1;-- WHEN (Reset ='0') ELSE PC_w(7 DOWNTO 0);
+		
+
+---------- Mux to select Branch Address or PC + 4 -----------       
+		Next_PC_w  <= 	X"00" 		WHEN Reset = '1' 	ELSE
+				PC_w(7 DOWNTO 0)WHEN Stall_IF ='1'	ELSE
+				Add_result_i 	WHEN PCSrc_i = "01" 	ELSE   -- branch
+				JumpAddr_i	WHEN PCSrc_i = "10"	ELSE	-- jump
+				PC_plus_4_w(7 DOWNTO 0);
+			
+---------- PC Proccess (CLK on rising edge) --------------
+
+--------- Instructions always start on word address - not byte -------
+			
+--	PROCESS  (clock,reset,next_pc_w,Stall_IF) didn't compile
+--	BEGIN
+	--	IF reset = '1' THEN
+		--	   PC_w(7 DOWNTO 0) <= "00000000";
+		--ELSIF ( (Stall_IF = '0') and ( clock'EVENT ) AND ( clock = '1' ) ) THEN
+			--   PC_w(7 DOWNTO 0) <= next_PC_w;
+	--	END IF;
+	--END PROCESS;
+PROCESS (clock, reset, next_pc_w, Stall_IF)
+BEGIN
+    IF reset = '1' THEN
+        PC_w(7 DOWNTO 0) <= "00000000";
+    ELSIF rising_edge(clock) THEN
+        IF Stall_IF = '0' and RUN ='1' THEN
+            PC_w(7 DOWNTO 0) <= next_PC_w;
+        END IF;
+    END IF;
+END PROCESS;
+
+--------- Copy output signals - allows read inside module -----------
+		IF_pc_o 	<= PC_w;
+		IF_pc_plus_4_o 	<= PC_plus_4_w;
+END behavior;
+
+

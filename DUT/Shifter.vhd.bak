@@ -1,0 +1,49 @@
+LIBRARY ieee;
+USE ieee.std_logic_1164.all;
+USE work.aux_package.all;
+
+-- Generic Shifter Entity
+ENTITY Shifter IS
+  GENERIC (
+    n : INTEGER := 32;     -- data width
+    k : INTEGER := 5       -- size of shamt
+  );
+  PORT (
+    x, y       : IN  STD_LOGIC_VECTOR(n-1 DOWNTO 0);     -- x contains shift amount in bits [k-1:0], y is data
+    dir        : IN  STD_LOGIC;       			 -- direction: '0' = left, '1' = right
+    res        : OUT STD_LOGIC_VECTOR(n-1 DOWNTO 0)
+  );
+END Shifter;
+
+-- Architecture
+ARCHITECTURE Shifter OF Shifter IS
+  SUBTYPE vector IS STD_LOGIC_VECTOR(n - 1 DOWNTO 0); 
+  TYPE matrix IS ARRAY (k DOWNTO 0) OF vector;
+  SIGNAL row : matrix;
+  SIGNAL shmat : std_logic_vector(k downto 0);
+BEGIN
+
+  shmat <= x(10 downto 5);
+
+  -- Initial load based on direction
+  first : FOR i IN 0 TO n-1 GENERATE
+    row(0)(i) <= y(i) WHEN dir = '0' ELSE
+                 y(n-1-i) WHEN dir = '1' ELSE
+                 '0';
+  END GENERATE;
+
+  -- Shift stages based on x(j-1)
+  shift : FOR j IN 1 TO k GENERATE
+    row(j) <= row(j-1)(n-2**(j-1) DOWNTO 0) & ((2**(j-1)) - 1 downto 0 => '0') WHEN shmat(j) = '1' ELSE
+              row(j-1);
+  END GENERATE;
+
+  -- Assign final result, reverse if dir = '1' (right shift)
+  backinv : FOR i IN 0 TO n-1 GENERATE
+    res(i) <= row(k)(i) WHEN dir = '0' ELSE
+              row(k)(n-1-i) WHEN dir = '1' ELSE
+              '0';
+  END GENERATE;
+
+
+END Shifter;
