@@ -1,6 +1,8 @@
 Project Name: Pipelined MIPS MCU
 Short Description
 
+![MIPS MCU Architecture](Pipelined_MIPS_top_entity.png)
+
 A complete MIPS-based microcontroller (MCU) design in VHDL, featuring single-cycle and 5-stage pipelined cores, memory-mapped I/O, interrupts, and serial communication. Designed for FPGA deployment, with full testing and debugging support.
 
 Main Components
